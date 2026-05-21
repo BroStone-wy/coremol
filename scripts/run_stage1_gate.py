@@ -18,6 +18,7 @@ from coremol.datasets.random_split import load_or_create_random_split
 from coremol.datasets.scaffold_split import load_or_create_split
 from coremol.metrics.mechanism import mechanism_summary
 from coremol.models.attentivefp_coremol import CoReMolAttentiveFP, CoReMolConfig
+from coremol.models.dmpnn_coremol import CoReMolDMPNN
 from coremol.models.graphformer_coremol import CoReMolGraphformer
 from coremol.probes.tcm import estimate_tcm_at_k
 from coremol.training.trainer import RegressionTargetScaler, evaluate_model, fine_tune_alignment, train_model
@@ -133,6 +134,8 @@ def build_model(dataset, dataset_name: str, task_type: str, variant: str, args):
             norm_style=args.graphformer_norm_style,
             feature_encoder=args.graphformer_feature_encoder,
         )
+    if args.backbone == "dmpnn":
+        return CoReMolDMPNN(**common_kwargs, readout=args.dmpnn_readout)
     return CoReMolAttentiveFP(**common_kwargs)
 
 
@@ -152,7 +155,7 @@ def collect_mechanism(model, dataset, device, max_graphs=64):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--datasets", nargs="+", default=["BBBP", "ESOL"])
-    parser.add_argument("--backbone", choices=["attentivefp", "graphformer"], default="attentivefp")
+    parser.add_argument("--backbone", choices=["attentivefp", "graphformer", "dmpnn"], default="attentivefp")
     parser.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     parser.add_argument("--epochs", type=int, default=60)
     parser.add_argument("--batch_size", type=int, default=64)
@@ -204,6 +207,7 @@ def main():
     parser.add_argument("--graphformer_num_heads", type=int, default=4)
     parser.add_argument("--graphformer_max_distance", type=int, default=5)
     parser.add_argument("--graphformer_feature_encoder", choices=["linear", "categorical"], default="linear")
+    parser.add_argument("--dmpnn_readout", choices=["mean", "mean_max"], default="mean")
     parser.add_argument("--tcm_graphs", type=int, default=48)
     parser.add_argument("--tcm_k", type=int, default=10)
     parser.add_argument("--results_name", type=str, default="stage1_gate")

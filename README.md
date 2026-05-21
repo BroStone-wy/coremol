@@ -4,7 +4,7 @@ CoReMol is a residual atom-pair communication adapter for molecular property pre
 
 The current code supports:
 
-- Backbones: `attentivefp`, `graphformer`
+- Backbones: `attentivefp`, `graphformer`, `dmpnn`
 - Tasks: MoleculeNet-style classification and regression datasets
 - Variants: `base`, `coremol`
 - Interpretability: training-time `TCM@k` diagnostics and post-hoc Full TCM via `scripts/compute_tcm_variants.py`

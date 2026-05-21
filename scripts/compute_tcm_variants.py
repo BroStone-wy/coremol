@@ -14,6 +14,7 @@ from coremol.datasets.random_split import load_or_create_random_split
 from coremol.datasets.scaffold_split import load_or_create_split
 from coremol.metrics.tcm import full_tcm, normalized_tcm_components, tcm_topk_components
 from coremol.models.attentivefp_coremol import CoReMolAttentiveFP, CoReMolConfig
+from coremol.models.dmpnn_coremol import CoReMolDMPNN
 from coremol.models.graphformer_coremol import CoReMolGraphformer
 from coremol.probes.tcm import _pair_sensitivity_from_base_model
 
@@ -81,6 +82,7 @@ def build_model(
     graphformer_ffn_ratio: int = 4,
     graphformer_norm_style: str = "pre",
     graphformer_feature_encoder: str = "linear",
+    dmpnn_readout: str = "mean",
 ):
     if in_channels is None or edge_dim is None:
         inferred_in_channels, inferred_edge_dim = infer_feature_dims(dataset)
@@ -127,6 +129,8 @@ def build_model(
             norm_style=graphformer_norm_style,
             feature_encoder=graphformer_feature_encoder,
         )
+    if backbone == "dmpnn":
+        return CoReMolDMPNN(**common, readout=dmpnn_readout)
     return CoReMolAttentiveFP(**common)
 
 
@@ -168,6 +172,7 @@ def compute_for_seed(
     graphformer_ffn_ratio: int,
     graphformer_norm_style: str,
     graphformer_feature_encoder: str,
+    dmpnn_readout: str,
 ):
     dataset = load_moleculenet(dataset_name, ROOT / "data" / "moleculenet")
     task_type = TASKS[dataset_name]["type"]
@@ -207,6 +212,7 @@ def compute_for_seed(
         graphformer_ffn_ratio=graphformer_ffn_ratio,
         graphformer_norm_style=graphformer_norm_style,
         graphformer_feature_encoder=graphformer_feature_encoder,
+        dmpnn_readout=dmpnn_readout,
     ).to(device)
     cal_model = build_model(
         dataset,
@@ -240,6 +246,7 @@ def compute_for_seed(
         graphformer_ffn_ratio=graphformer_ffn_ratio,
         graphformer_norm_style=graphformer_norm_style,
         graphformer_feature_encoder=graphformer_feature_encoder,
+        dmpnn_readout=dmpnn_readout,
     ).to(device)
     ckpt = run_dir / "checkpoints"
     base_report = load_compatible_state(base_model, torch.load(ckpt / f"{dataset_name}_{seed}_base.pt", map_location=device))
@@ -306,7 +313,7 @@ def main():
     parser.add_argument("--run_dir", default=str(ROOT / "results" / "stage1_gate_standard_split"))
     parser.add_argument("--datasets", nargs="+", default=None)
     parser.add_argument("--seeds", nargs="+", type=int, default=None)
-    parser.add_argument("--backbone", choices=["attentivefp", "graphformer"], default="attentivefp")
+    parser.add_argument("--backbone", choices=["attentivefp", "graphformer", "dmpnn"], default="attentivefp")
     parser.add_argument("--hidden_channels", type=int, default=32)
     parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--num_timesteps", type=int, default=2)
@@ -337,6 +344,7 @@ def main():
     parser.add_argument("--graphformer_num_heads", type=int, default=4)
     parser.add_argument("--graphformer_max_distance", type=int, default=5)
     parser.add_argument("--graphformer_feature_encoder", choices=["linear", "categorical"], default="linear")
+    parser.add_argument("--dmpnn_readout", choices=["mean", "mean_max"], default="mean")
     parser.add_argument("--max_graphs", type=int, default=0)
     args = parser.parse_args()
 
@@ -391,6 +399,7 @@ def main():
                     graphformer_ffn_ratio=args.graphformer_ffn_ratio,
                     graphformer_norm_style=args.graphformer_norm_style,
                     graphformer_feature_encoder=args.graphformer_feature_encoder,
+                    dmpnn_readout=args.dmpnn_readout,
                 )
             )
     out = pd.DataFrame(rows)
