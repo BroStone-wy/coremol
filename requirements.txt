@@ -1,0 +1,9 @@
+torch
+torch-geometric
+rdkit-pypi
+scikit-learn
+pandas
+pyyaml
+pytest
+tqdm
+
