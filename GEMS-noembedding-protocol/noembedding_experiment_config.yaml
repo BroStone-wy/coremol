@@ -1,0 +1,181 @@
+protocol_name: gems_noembedding_cleansplit_affinity
+date: "2026-05-26"
+purpose: >
+  Fixed no-embedding CleanSplit protocol for comparing CheapNet, GIGN,
+  EHIGN, their +CoReMol variants, and the local RPLI+CoReMol reference.
+
+environment:
+  conda_env: GNRF
+  pythonpath:
+    - "."
+    - "/home/legion-w5/LabData/Stone/GEMS"
+  notes:
+    - "GEMS dataset pickle loading needs the GEMS repo on PYTHONPATH."
+
+datasets:
+  root: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets"
+  train: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_train_cleansplit.pt"
+  casf2016: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_casf2016.pt"
+  casf2016_indep: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_casf2016_indep.pt"
+  casf2013_optional: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_casf2013.pt"
+  casf2013_indep_optional: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_casf2013_indep.pt"
+  train_size: 16491
+  graph_feature_rule: "Use graph/geometry features from 00AEPL only."
+
+no_embedding_rule:
+  required: true
+  local_flag: "--ignore_lig_emb"
+  reason: "00AEPL contains lig_emb=(1,384), but GEMS18e no-embedding ignores it."
+  forbidden_inputs:
+    - "data.lig_emb"
+    - "ChemBERTa ligand embedding"
+    - "protein language-model embedding"
+    - "external pretrained ligand/protein embedding"
+  checkpoint_expectation:
+    ligand_global_dim: 0
+
+split:
+  n_folds: 5
+  fold: 0
+  seed: 0
+  method: "StratifiedKFold(n_splits=5, random_state=0, shuffle=True)"
+  stratification: "rounded scaled affinity labels from the CleanSplit train set"
+
+labels:
+  training_scale: "[0, 1]"
+  report_transform: "pK = scaled_value * 16.0"
+
+metrics:
+  primary:
+    - rmse_pk
+    - pearson
+  secondary:
+    - mae_pk
+    - spearman
+    - kendall_tau
+    - r2
+  evaluation_sets:
+    - casf2016
+    - casf2016_indep
+
+official_gems18e_reference:
+  model: "GEMS18e"
+  dataset_id: "00AEPL"
+  embedding_used: "none"
+  fold0:
+    checkpoints: 1
+    casf2016:
+      rmse: 1.4474
+      pearson: 0.7544
+      spearman: 0.7426
+    casf2016_indep:
+      rmse: 1.5500
+      pearson: 0.7640
+      spearman: 0.7703
+  ensemble:
+    checkpoints: 5
+    casf2016:
+      rmse: 1.3497
+      pearson: 0.7966
+      spearman: 0.7841
+    casf2016_indep:
+      rmse: 1.4440
+      pearson: 0.8104
+      spearman: 0.8183
+
+local_reference_results:
+  rpli_baseline:
+    checkpoint: "results/gems_no_embedding_affinity/noemb_rpli_base_rmse_base_fold0/best_model.pt"
+    checkpoints: 1
+    embedding_used: "none"
+    casf2016:
+      rmse: 1.4677
+      pearson: 0.7462
+      spearman: 0.7426
+    casf2016_indep:
+      rmse: 1.6109
+      pearson: 0.7251
+      spearman: 0.7268
+  rpli_coremol_dual:
+    checkpoint: "results/gems_no_embedding_affinity/noemb_rpli_dual_a080_b100_c020_coremol_fold0/best_model.pt"
+    checkpoints: 1
+    embedding_used: "none"
+    best_epoch: 50
+    best_valid_rmse: 1.3069
+    casf2016:
+      rmse: 1.3621
+      pearson: 0.8027
+      spearman: 0.7931
+    casf2016_indep:
+      rmse: 1.4359
+      pearson: 0.8259
+      spearman: 0.8259
+
+rpli_coremol_train_args:
+  dataset_path: "/home/legion-w5/LabData/Stone/GEMS_datasets/extracted/GEMS_pytorch_datasets/00AEPL_train_cleansplit.pt"
+  run_name: "noemb_rpli_dual_a080_b100_c020"
+  variant: "coremol"
+  backbone: "rpli"
+  fold: 0
+  n_folds: 5
+  seed: 0
+  epochs: 180
+  patience: 30
+  batch_size: 256
+  lr: 0.001
+  weight_decay: 0.00001
+  loss_func: "rmse"
+  hidden_channels: 64
+  context_channels: 384
+  dropout: 0.10
+  conv_dropout: 0.00
+  cross_position: "post"
+  cross_update: "readout"
+  interface_gate_init: 1.0
+  readout_mode: "dual"
+  final_blend_alpha: 0.8
+  base_aux_weight: 1.0
+  coremol_aux_weight: 0.2
+  selection_metric: "rmse"
+  ignore_lig_emb: true
+  amp: true
+  save_dir: "results/gems_no_embedding_affinity"
+
+external_backbone_targets:
+  - backbone: "CheapNet"
+    required_rows:
+      - "CheapNet baseline"
+      - "CheapNet + CoReMol"
+    protocol: "Use 00AEPL no-embedding settings above."
+  - backbone: "GIGN"
+    required_rows:
+      - "GIGN baseline"
+      - "GIGN + CoReMol"
+    protocol: "Use 00AEPL no-embedding settings above."
+  - backbone: "EHIGN"
+    required_rows:
+      - "EHIGN baseline"
+      - "EHIGN + CoReMol"
+    protocol: "Use 00AEPL no-embedding settings above."
+
+reporting:
+  main_table_columns:
+    - method
+    - backbone
+    - variant
+    - embedding_used
+    - train_file
+    - fold
+    - seed
+    - checkpoint_count
+    - casf2016_rmse
+    - casf2016_pearson
+    - casf2016_spearman
+    - casf2016_indep_rmse
+    - casf2016_indep_pearson
+    - casf2016_indep_spearman
+    - notes
+  direct_fairness_rule: >
+    Only rows using 00AEPL, fold0, and no embeddings belong in the direct
+    local comparison table. Paper-reported values with different features
+    must be shown separately.
